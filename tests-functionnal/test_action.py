@@ -36,16 +36,16 @@ from base import AppTestCase
 
 class TestAction(AppTestCase):
 
-    def test_blocking_trigger_to_nonblocking_action(self):
+    def test_nonblocking_action(self):
         self.start_dialog('action')
         action = self.funq.action(path='mainWindow::ActionDialog::nonblockingAction')
-        action.trigger(blocking=True)
+        action.trigger()
         self.assertEquals(self.get_status_text(), 'nonblocking triggered !')
 
-    def test_nonblocking_trigger_to_blocking_action(self):
+    def test_blocking_action(self):
         self.start_dialog('action')
         action = self.funq.action(path='mainWindow::ActionDialog::blockingAction')
-        action.trigger(blocking=False)
+        action.trigger()
         # close the blocking message box
         btn = self.funq.widget(path='QMessageBox::qt_msgbox_buttonbox::QPushButton')
         btn.click()
