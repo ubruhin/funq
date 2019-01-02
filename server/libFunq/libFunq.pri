@@ -10,6 +10,7 @@ SOURCES += $${PWD}/player.cpp \
     $${PWD}/objectpath.cpp \
     $${PWD}/dragndropresponse.cpp \
     $${PWD}/eventsprocessednotifier.cpp \
+    $${PWD}/eventsprocessedresponse.cpp \
     $${PWD}/shortcutresponse.cpp \
     $${PWD}/pick.cpp
 
@@ -18,6 +19,7 @@ HEADERS += $${PWD}/player.h \
     $${PWD}/objectpath.h \
     $${PWD}/dragndropresponse.h \
     $${PWD}/eventsprocessednotifier.h \
+    $${PWD}/eventsprocessedresponse.h \
     $${PWD}/shortcutresponse.h \
     $${PWD}/pick.h
 
