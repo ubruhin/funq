@@ -57,6 +57,7 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include <QQuickView>
 #endif
 
+#include "eventsprocessedresponse.h"
 #include "objectpath.h"
 #include "player.h"
 #include "shortcutresponse.h"
@@ -360,7 +361,7 @@ private slots:
         command["oid"] = resultPath["oid"];
         command["properties"] = properties;
 
-        QtJson::JsonObject result = player.object_set_properties(command);
+        player.object_set_properties(command);
 
         qApp->processEvents();
 
@@ -484,7 +485,9 @@ private slots:
         command["slot_name"] = "editVariant";
         command["params"] = 23;
 
-        QVariant result_slot = player.call_slot(command)["result_slot"];
+        EventsProcessedResponse * response =
+            qobject_cast<EventsProcessedResponse *>(player.call_slot(command));
+        QVariant result_slot = response->response()["result_slot"];
         QCOMPARE(result_slot, QVariant(123));
         QCOMPARE(testslot.m_variant, QVariant(23));
     }
@@ -650,7 +653,7 @@ private slots:
         QBuffer buffer;
         Player player(&buffer);
 
-        QtJson::JsonObject commandPath, resultPath, command, result;
+        QtJson::JsonObject commandPath, resultPath, command;
 
         for (int i = 0; i < columns.count(); i++) {
             QSignalSpy hspy(table.horizontalHeader(),
@@ -659,7 +662,7 @@ private slots:
             resultPath = player.widget_by_path(commandPath);
             command["oid"] = resultPath["oid"];
             command["indexOrName"] = i;
-            result = player.headerview_click(command);
+            player.headerview_click(command);
             qApp->processEvents();
             QCOMPARE(hspy.count(), 1);
             QCOMPARE(hspy.first().first().toInt(), i);
@@ -672,7 +675,7 @@ private slots:
             resultPath = player.widget_by_path(commandPath);
             command["oid"] = resultPath["oid"];
             command["indexOrName"] = i;
-            result = player.headerview_click(command);
+            player.headerview_click(command);
             qApp->processEvents();
             QCOMPARE(vspy.count(), 1);
             QCOMPARE(vspy.first().first().toInt(), i);
@@ -710,14 +713,14 @@ private slots:
         QBuffer buffer;
         Player player(&buffer);
 
-        QtJson::JsonObject commandPath, resultPath, command, result;
+        QtJson::JsonObject commandPath, resultPath, command;
 
         QSignalSpy hspy(table.horizontalHeader(), SIGNAL(sectionClicked(int)));
         commandPath["path"] = "QTableWidget::H";
         resultPath = player.widget_by_path(commandPath);
         command["oid"] = resultPath["oid"];
         command["indexOrName"] = "C2";
-        result = player.headerview_click(command);
+        player.headerview_click(command);
         qApp->processEvents();
         QCOMPARE(hspy.count(), 1);
         QCOMPARE(hspy.first().first().toInt(), 1);

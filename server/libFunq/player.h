@@ -78,27 +78,25 @@ public slots:
     QtJson::JsonObject widget_by_path(const QtJson::JsonObject & command);
     QtJson::JsonObject active_widget(const QtJson::JsonObject & command);
     QtJson::JsonObject object_properties(const QtJson::JsonObject & command);
-    QtJson::JsonObject object_set_properties(
-        const QtJson::JsonObject & command);
-    QtJson::JsonObject action_trigger(const QtJson::JsonObject & command);
+    DelayedResponse * object_set_properties(const QtJson::JsonObject & command);
+    DelayedResponse * action_trigger(const QtJson::JsonObject & command);
     QtJson::JsonObject widgets_list(const QtJson::JsonObject & command);
-    QtJson::JsonObject widget_click(const QtJson::JsonObject & command);
-    QtJson::JsonObject widget_close(const QtJson::JsonObject & command);
+    DelayedResponse * widget_click(const QtJson::JsonObject & command);
+    DelayedResponse * widget_close(const QtJson::JsonObject & command);
     DelayedResponse * drag_n_drop(const QtJson::JsonObject & command);
     QtJson::JsonObject model_items(const QtJson::JsonObject & command);
-    QtJson::JsonObject model_item_action(const QtJson::JsonObject & command);
-    QtJson::JsonObject model_gitem_action(const QtJson::JsonObject & command);
+    DelayedResponse * model_item_action(const QtJson::JsonObject & command);
+    DelayedResponse * model_gitem_action(const QtJson::JsonObject & command);
     QtJson::JsonObject grab(const QtJson::JsonObject & command);
-    QtJson::JsonObject widget_keyclick(const QtJson::JsonObject & command);
+    DelayedResponse * widget_keyclick(const QtJson::JsonObject & command);
     DelayedResponse * shortcut(const QtJson::JsonObject & command);
     QtJson::JsonObject tabbar_list(const QtJson::JsonObject & command);
     QtJson::JsonObject graphicsitems(const QtJson::JsonObject & command);
     QtJson::JsonObject gitem_properties(const QtJson::JsonObject & command);
-    QtJson::JsonObject call_slot(const QtJson::JsonObject & command);
-    QtJson::JsonObject widget_activate_focus(
-        const QtJson::JsonObject & command);
+    DelayedResponse * call_slot(const QtJson::JsonObject & command);
+    DelayedResponse * widget_activate_focus(const QtJson::JsonObject & command);
     QtJson::JsonObject headerview_list(const QtJson::JsonObject & command);
-    QtJson::JsonObject headerview_click(const QtJson::JsonObject & command);
+    DelayedResponse * headerview_click(const QtJson::JsonObject & command);
     QtJson::JsonObject headerview_path_from_view(
         const QtJson::JsonObject & command);
     QtJson::JsonObject grab_graphics_view(const QtJson::JsonObject & command);
@@ -106,7 +104,7 @@ public slots:
     QtJson::JsonObject quit(const QtJson::JsonObject & command);
 
     QtJson::JsonObject quick_item_find(const QtJson::JsonObject & command);
-    QtJson::JsonObject quick_item_click(const QtJson::JsonObject & command);
+    DelayedResponse * quick_item_click(const QtJson::JsonObject & command);
 
 protected:
     QtJson::JsonObject createQtQuickOnlyError() {

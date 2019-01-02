@@ -35,6 +35,7 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include "player.h"
 
 #include "dragndropresponse.h"
+#include "eventsprocessedresponse.h"
 #include "objectpath.h"
 #include "shortcutresponse.h"
 
@@ -422,16 +423,19 @@ QtJson::JsonObject Player::object_properties(
     return result;
 }
 
-QtJson::JsonObject Player::object_set_properties(
+DelayedResponse * Player::object_set_properties(
     const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     ObjectLocatorContext ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        result = ctx.lastError;
+    } else {
+        QVariantMap properties = command["properties"].value<QVariantMap>();
+        _object_set_properties(ctx.obj, properties);
     }
-    QVariantMap properties = command["properties"].value<QVariantMap>();
-    _object_set_properties(ctx.obj, properties);
-    QtJson::JsonObject result;
-    return result;
+    // Maybe changing properties caused some events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
 void Player::_object_set_properties(QObject * object,
@@ -499,73 +503,73 @@ QtJson::JsonObject Player::quit(const QtJson::JsonObject &) {
     return result;
 }
 
-QtJson::JsonObject Player::action_trigger(const QtJson::JsonObject & command) {
+DelayedResponse * Player::action_trigger(const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     WidgetLocatorContext<QAction> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
-    }
-    bool blocking = command["blocking"].toBool();
-    if (blocking) {
-        // block until QAction::trigger() returns
-        ctx.widget->trigger();
+        result = ctx.lastError;
     } else {
-        // trigger the action, but return immediately
+        // trigger the action asynchronously because it could be blocking
         QTimer::singleShot(0, ctx.widget, SLOT(trigger()));
     }
-    QtJson::JsonObject result;
-    return result;
+    // Use delayed response to be sure the action was executed before we send
+    // the response.
+    return new EventsProcessedResponse(this, result);
 }
 
-QtJson::JsonObject Player::widget_click(const QtJson::JsonObject & command) {
+DelayedResponse * Player::widget_click(const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     WidgetLocatorContext<QWidget> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
-    }
-    QString action = command["mouseAction"].toString();
-    QPoint pos = ctx.widget->rect().center();
-    if (action == "doubleclick") {
-        mouse_dclick(ctx.widget, pos);
-    } else if (action == "rightclick") {
-        mouse_click(ctx.widget, pos, Qt::RightButton);
-    } else if (action == "middleclick") {
-        mouse_click(ctx.widget, pos, Qt::MiddleButton);
+        result = ctx.lastError;
     } else {
-        mouse_click(ctx.widget, pos, Qt::LeftButton);
+        QString action = command["mouseAction"].toString();
+        QPoint pos = ctx.widget->rect().center();
+        if (action == "doubleclick") {
+            mouse_dclick(ctx.widget, pos);
+        } else if (action == "rightclick") {
+            mouse_click(ctx.widget, pos, Qt::RightButton);
+        } else if (action == "middleclick") {
+            mouse_click(ctx.widget, pos, Qt::MiddleButton);
+        } else {
+            mouse_click(ctx.widget, pos, Qt::LeftButton);
+        }
     }
-    QtJson::JsonObject result;
-    return result;
+    // Maybe the click caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
-QtJson::JsonObject Player::quick_item_click(
-    const QtJson::JsonObject & command) {
+DelayedResponse * Player::quick_item_click(const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
 #ifdef QT_QUICK_LIB
     QuickItemLocatorContext ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        result = ctx.lastError;
+    } else {
+        QPointF relativeCenter(ctx.item->width() / 2.0,
+                               ctx.item->height() / 2.0);
+        QPoint sPos = ctx.item->mapToScene(relativeCenter).toPoint();
+        mouse_click(ctx.window, sPos, Qt::LeftButton);
     }
-
-    QPointF relativeCenter(ctx.item->width() / 2.0, ctx.item->height() / 2.0);
-
-    QPoint sPos = ctx.item->mapToScene(relativeCenter).toPoint();
-
-    mouse_click(ctx.window, sPos, Qt::LeftButton);
-    QtJson::JsonObject result;
-    return result;
 #else
-    return createQtQuickOnlyError();
+    result = createQtQuickOnlyError();
 #endif
+    // Maybe the click caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
-QtJson::JsonObject Player::widget_close(const QtJson::JsonObject & command) {
+DelayedResponse * Player::widget_close(const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     WidgetLocatorContext<QWidget> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        result = ctx.lastError;
+    } else {
+        QTimer::singleShot(0, ctx.widget, SLOT(close()));
     }
-
-    QTimer::singleShot(0, ctx.widget, SLOT(close()));
-
-    QtJson::JsonObject result;
-    return result;
+    // Delay the response until the widget was really closed.
+    return new EventsProcessedResponse(this, result);
 }
 
 QtJson::JsonObject Player::model_items(const QtJson::JsonObject & command) {
@@ -588,27 +592,31 @@ QtJson::JsonObject Player::model_items(const QtJson::JsonObject & command) {
     return result;
 }
 
-QtJson::JsonObject Player::model_item_action(
+DelayedResponse * Player::model_item_action(
     const QtJson::JsonObject & command) {
     WidgetLocatorContext<QAbstractItemView> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        return new EventsProcessedResponse(this, ctx.lastError);
     }
     QAbstractItemModel * model = ctx.widget->model();
     if (!model) {
-        return createError(
-            "MissingModel",
-            QString::fromUtf8("The view (id:%1) has no associated model")
-                .arg(ctx.id));
+        return new EventsProcessedResponse(
+            this,
+            createError(
+                "MissingModel",
+                QString::fromUtf8("The view (id:%1) has no associated model")
+                    .arg(ctx.id)));
     }
     QModelIndex index =
         get_model_item(model, command["itempath"].toString(),
                        command["row"].toInt(), command["column"].toInt());
     if (!index.isValid()) {
-        return createError(
-            "MissingModelItem",
-            QString::fromUtf8("Unable to find an item identified by %1")
-                .arg(command["itempath"].toString()));
+        return new EventsProcessedResponse(
+            this,
+            createError(
+                "MissingModelItem",
+                QString::fromUtf8("Unable to find an item identified by %1")
+                    .arg(command["itempath"].toString())));
     }
     ctx.widget->scrollTo(index);  // item visible
     QString itemaction = command["itemaction"].toString();
@@ -644,6 +652,7 @@ QtJson::JsonObject Player::model_item_action(
         cursorPosition.setY(newY);
     }
 
+    QtJson::JsonObject result;
     if (itemaction == "select") {
         _model_item_action(itemaction, ctx.widget, index);
     } else if (itemaction == "edit") {
@@ -657,12 +666,14 @@ QtJson::JsonObject Player::model_item_action(
     } else if (itemaction == "doubleclick") {
         mouse_dclick(ctx.widget->viewport(), cursorPosition);
     } else {
-        return createError(
+        result = createError(
             "MissingItemAction",
             QString::fromUtf8("itemaction %1 unknown").arg(itemaction));
     }
-    QtJson::JsonObject result;
-    return result;
+
+    // Maybe the action caused some more events in the AUT, thus we delay the
+    // response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
 void Player::_model_item_action(const QString & action,
@@ -676,24 +687,27 @@ void Player::_model_item_action(const QString & action,
     }
 }
 
-QtJson::JsonObject Player::model_gitem_action(
+DelayedResponse * Player::model_gitem_action(
     const QtJson::JsonObject & command) {
     WidgetLocatorContext<QGraphicsView> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        return new EventsProcessedResponse(this, ctx.lastError);
     }
     qulonglong gid = command["gid"].value<qulonglong>();
     QGraphicsItem * item = graphicsItemFromId(ctx.widget, gid);
     if (!item) {
-        return createError(
-            "MissingGItem",
-            QString::fromUtf8("The view (id:%1) has no associated item %2")
-                .arg(ctx.id)
-                .arg(gid));
+        return new EventsProcessedResponse(
+            this,
+            createError(
+                "MissingGItem",
+                QString::fromUtf8("The view (id:%1) has no associated item %2")
+                    .arg(ctx.id)
+                    .arg(gid)));
     }
     ctx.widget->ensureVisible(item);  // be sure item is visible
     QString itemaction = command["itemaction"].toString();
 
+    QtJson::JsonObject result;
     QPoint viewPos = ctx.widget->mapFromScene(
         item->mapToScene(item->boundingRect().center()));
     if (itemaction == "click" || itemaction == "rightclick" ||
@@ -714,12 +728,14 @@ QtJson::JsonObject Player::model_gitem_action(
         }
         mouse_dclick(ctx.widget->viewport(), viewPos);
     } else {
-        return createError(
+        result = createError(
             "MissingItemAction",
             QString::fromUtf8("itemaction %1 unknown").arg(itemaction));
     }
-    QtJson::JsonObject result;
-    return result;
+
+    // Maybe the action caused some more events in the AUT, thus we delay the
+    // response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
 QtJson::JsonObject Player::grab(const QtJson::JsonObject & command) {
@@ -749,12 +765,12 @@ QtJson::JsonObject Player::grab(const QtJson::JsonObject & command) {
     return result;
 }
 
-QtJson::JsonObject Player::widget_keyclick(const QtJson::JsonObject & command) {
+DelayedResponse * Player::widget_keyclick(const QtJson::JsonObject & command) {
     QWidget * widget;
     if (command.contains("oid")) {
         WidgetLocatorContext<QWidget> ctx(this, command, "oid");
         if (ctx.hasError()) {
-            return ctx.lastError;
+            return new EventsProcessedResponse(this, ctx.lastError);
         }
         widget = ctx.widget;
     } else {
@@ -771,8 +787,10 @@ QtJson::JsonObject Player::widget_keyclick(const QtJson::JsonObject & command) {
             widget,
             new QKeyEvent(QKeyEvent::KeyRelease, key, Qt::NoModifier, ch));
     }
-    QtJson::JsonObject result;
-    return result;
+
+    // Maybe the key events caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, QtJson::JsonObject());
 }
 
 DelayedResponse * Player::shortcut(const QtJson::JsonObject & command) {
@@ -817,11 +835,10 @@ QtJson::JsonObject Player::headerview_list(const QtJson::JsonObject & command) {
     return result;
 }
 
-QtJson::JsonObject Player::headerview_click(
-    const QtJson::JsonObject & command) {
+DelayedResponse * Player::headerview_click(const QtJson::JsonObject & command) {
     WidgetLocatorContext<QHeaderView> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        return new EventsProcessedResponse(this, ctx.lastError);
     }
     int logicalIndex;
     QVariant indexOrName = command["indexOrName"];
@@ -829,11 +846,13 @@ QtJson::JsonObject Player::headerview_click(
         QString name = indexOrName.toString();
         QAbstractItemModel * model = ctx.widget->model();
         if (!model) {
-            return createError(
-                "MissingModel",
-                QString::fromUtf8(
-                    "The header view (id:%1) has no associated model")
-                    .arg(ctx.id));
+            return new EventsProcessedResponse(
+                this,
+                createError(
+                    "MissingModel",
+                    QString::fromUtf8(
+                        "The header view (id:%1) has no associated model")
+                        .arg(ctx.id)));
         }
         bool found = false;
         int nbItems = ctx.widget->orientation() == Qt::Horizontal
@@ -848,12 +867,14 @@ QtJson::JsonObject Player::headerview_click(
             }
         }
         if (!found) {
-            return createError(
-                "MissingHeaderViewText",
-                QString::fromUtf8(
-                    "The header view (id:%1) has no text column `%2`")
-                    .arg(ctx.id)
-                    .arg(name));
+            return new EventsProcessedResponse(
+                this,
+                createError(
+                    "MissingHeaderViewText",
+                    QString::fromUtf8(
+                        "The header view (id:%1) has no text column `%2`")
+                        .arg(ctx.id)
+                        .arg(name)));
         }
     } else {
         logicalIndex = ctx.widget->logicalIndex(command["indexOrName"].toInt());
@@ -861,12 +882,14 @@ QtJson::JsonObject Player::headerview_click(
 
     int pos = ctx.widget->sectionPosition(logicalIndex);
     if (pos == -1) {
-        return createError(
-            "InvalidHeaderViewIndex",
-            QString::fromUtf8(
-                "The header view (id:%1) has no index %2 or it is hidden")
-                .arg(ctx.id)
-                .arg(logicalIndex));
+        return new EventsProcessedResponse(
+            this,
+            createError(
+                "InvalidHeaderViewIndex",
+                QString::fromUtf8(
+                    "The header view (id:%1) has no index %2 or it is hidden")
+                    .arg(ctx.id)
+                    .arg(logicalIndex)));
     }
     QPoint mousePos;
     if (ctx.widget->orientation() == Qt::Horizontal) {
@@ -877,8 +900,10 @@ QtJson::JsonObject Player::headerview_click(
         mousePos.setY(pos + ctx.widget->offset() + 5);
     }
     mouse_click(ctx.widget->viewport(), mousePos, Qt::LeftButton);
-    QtJson::JsonObject result;
-    return result;
+
+    // Maybe the key event caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, QtJson::JsonObject());
 }
 
 QtJson::JsonObject Player::headerview_path_from_view(
@@ -963,38 +988,46 @@ DelayedResponse * Player::drag_n_drop(const QtJson::JsonObject & command) {
     return new DragNDropResponse(this, command);
 }
 
-QtJson::JsonObject Player::call_slot(const QtJson::JsonObject & command) {
+DelayedResponse * Player::call_slot(const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     WidgetLocatorContext<QWidget> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
-    }
-    QString slot_name = command["slot_name"].toString();
-    QVariant result_slot;
-    bool invokedMeth = QMetaObject::invokeMethod(
-        ctx.widget, slot_name.toLocal8Bit().data(), Qt::DirectConnection,
-        Q_RETURN_ARG(QVariant, result_slot),
-        Q_ARG(QVariant, command["params"]));
-    if (!invokedMeth) {
-        return createError("NoMethodInvoked",
-                           QString::fromUtf8("The slot %1 could not be called")
-                               .arg(slot_name));
+        result = ctx.lastError;
+    } else {
+        QString slot_name = command["slot_name"].toString();
+        QVariant result_slot;
+        bool invokedMeth = QMetaObject::invokeMethod(
+            ctx.widget, slot_name.toLocal8Bit().data(), Qt::DirectConnection,
+            Q_RETURN_ARG(QVariant, result_slot),
+            Q_ARG(QVariant, command["params"]));
+        if (invokedMeth) {
+            result["result_slot"] = result_slot;
+        } else {
+            result =
+                createError("NoMethodInvoked",
+                            QString::fromUtf8("The slot %1 could not be called")
+                                .arg(slot_name));
+        }
     }
 
-    QtJson::JsonObject result;
-    result["result_slot"] = result_slot;
-    return result;
+    // Maybe the slot caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
-QtJson::JsonObject Player::widget_activate_focus(
+DelayedResponse * Player::widget_activate_focus(
     const QtJson::JsonObject & command) {
+    QtJson::JsonObject result;
     WidgetLocatorContext<QWidget> ctx(this, command, "oid");
     if (ctx.hasError()) {
-        return ctx.lastError;
+        result = ctx.lastError;
+    } else {
+        activate_focus(ctx.widget);
     }
-    activate_focus(ctx.widget);
 
-    QtJson::JsonObject result;
-    return result;
+    // Maybe the focus change caused some more events in the AUT, thus we delay
+    // the response until all events are processed (to be on the safe side).
+    return new EventsProcessedResponse(this, result);
 }
 
 QtJson::JsonObject Player::grab_graphics_view(
