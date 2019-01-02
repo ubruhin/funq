@@ -42,7 +42,7 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 
 ShortcutResponse::ShortcutResponse(JsonClient * client,
                                    const QtJson::JsonObject & command)
-    : DelayedResponse(client, command), m_target(NULL) {
+    : DelayedResponse(client), m_target(NULL) {
     if (command.contains("oid")) {
         WidgetLocatorContext<QWidget> ctx(static_cast<Player *>(jsonClient()),
                                           command, "oid");
@@ -54,51 +54,58 @@ ShortcutResponse::ShortcutResponse(JsonClient * client,
     } else {
         m_target = qApp->activeWindow();
     }
-    if (m_target) {
-        connect(m_target, SIGNAL(destroyed()), this, SLOT(on_target_deleted()));
-    }
     m_binding = QKeySequence::fromString(command["keysequence"].toString());
 }
 
-void ShortcutResponse::on_target_deleted() {
-    m_target = NULL;
+void ShortcutResponse::start() {
+    QTimer::singleShot(0, this, SLOT(execute_repaint()));
 }
 
-void ShortcutResponse::execute(int call) {
-    if (!m_target) {
-        // this can happen when target is deleted for example in
-        // step 2, after a press event has been sent. We do not
-        // want it to be an error.
-        writeResponse(QtJson::JsonObject());
-        return;
-    }
-    if (call == 0) {
+void ShortcutResponse::execute_repaint() {
+    if (m_target) {
         m_target->repaint();
-        setInterval(100);
-    } else if (call == 1) {
+    }
+    QTimer::singleShot(100, this, SLOT(execute_grab_keyboard()));
+}
+
+void ShortcutResponse::execute_grab_keyboard() {
+    if (m_target) {
         m_target->grabKeyboard();
-    } else if (call == 2) {
-        // taken from
-        // http://stackoverflow.com/questions/14283764/how-can-i-simulate-emission-of-a-standard-key-sequence
-        for (uint i = 0; i < m_binding.count(); ++i) {
-            uint key = m_binding[i];
-            Qt::KeyboardModifiers modifiers =
-                static_cast<Qt::KeyboardModifiers>(key &
-                                                   Qt::KeyboardModifierMask);
-            key = key & ~Qt::KeyboardModifierMask;
+    }
+    QTimer::singleShot(100, this, SLOT(execute_press_keys()));
+}
+
+void ShortcutResponse::execute_press_keys() {
+    // taken from
+    // http://stackoverflow.com/questions/14283764/how-can-i-simulate-emission-of-a-standard-key-sequence
+    for (int i = 0; i < m_binding.count(); ++i) {
+        uint key = m_binding[i];
+        Qt::KeyboardModifiers modifiers =
+            static_cast<Qt::KeyboardModifiers>(key & Qt::KeyboardModifierMask);
+        key = key & ~Qt::KeyboardModifierMask;
+        if (m_target) {
             QTest::keyPress(m_target, static_cast<Qt::Key>(key), modifiers);
         }
-    } else if (call == 3) {
-        for (uint i = 0; i < m_binding.count(); ++i) {
-            uint key = m_binding[i];
-            Qt::KeyboardModifiers modifiers =
-                static_cast<Qt::KeyboardModifiers>(key &
-                                                   Qt::KeyboardModifierMask);
-            key = key & ~Qt::KeyboardModifierMask;
+    }
+    QTimer::singleShot(100, this, SLOT(execute_release_keys()));
+}
+
+void ShortcutResponse::execute_release_keys() {
+    for (int i = 0; i < m_binding.count(); ++i) {
+        uint key = m_binding[i];
+        Qt::KeyboardModifiers modifiers =
+            static_cast<Qt::KeyboardModifiers>(key & Qt::KeyboardModifierMask);
+        key = key & ~Qt::KeyboardModifierMask;
+        if (m_target) {
             QTest::keyRelease(m_target, static_cast<Qt::Key>(key), modifiers);
         }
-    } else if (call == 4) {
-        m_target->releaseKeyboard();
-        writeResponse(QtJson::JsonObject());
     }
+    QTimer::singleShot(100, this, SLOT(execute_release_keyboard()));
+}
+
+void ShortcutResponse::execute_release_keyboard() {
+    if (m_target) {
+        m_target->releaseKeyboard();
+    }
+    writeResponse(QtJson::JsonObject());
 }

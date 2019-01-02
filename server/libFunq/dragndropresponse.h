@@ -37,23 +37,27 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 
 #include "delayedresponse.h"
 
+#include <QPointer>
 #include <QWidget>
 
 class DragNDropResponse : public DelayedResponse {
+    Q_OBJECT
 public:
     explicit DragNDropResponse(JsonClient * client,
                                const QtJson::JsonObject & command);
 
-protected:
-    virtual void execute(int call);
+    virtual void start();
 
-signals:
-
-public slots:
+private slots:
+    void execute_repaint();
+    void execute_press();
+    void execute_move();
+    void execute_release();
+    void execute_response();
 
 private:
-    QWidget * m_src;
-    QWidget * m_dest;
+    QPointer<QWidget> m_src;
+    QPointer<QWidget> m_dest;
     QPoint m_srcPos, m_srcPosGlobal;
     QPoint m_destPos, m_destPosGlobal;
 };

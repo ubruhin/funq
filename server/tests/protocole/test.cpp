@@ -67,17 +67,24 @@ public slots:
 };
 
 class TestDelayedResponse : public DelayedResponse {
+    Q_OBJECT
 public:
-    TestDelayedResponse(JsonClient * client, const QtJson::JsonObject & command,
-                        int nb_exec_before_response = 0, int interval = 0,
-                        int timerOut = 20000)
-        : DelayedResponse(client, command, interval, timerOut),
+    TestDelayedResponse(JsonClient * client, int nb_exec_before_response = 0,
+                        int interval = 0, int timeout = 20000)
+        : DelayedResponse(client, timeout),
           nb_executed(0),
-          _nb_exec_before_response(nb_exec_before_response) {}
+          _nb_exec_before_response(nb_exec_before_response),
+          _interval(interval) {}
 
-    void execute(int) {
+    int nb_executed;
+
+    void start() { QTimer::singleShot(_interval, this, SLOT(execute())); }
+
+private slots:
+    void execute() {
         nb_executed += 1;
         if (_nb_exec_before_response > 0) {
+            QTimer::singleShot(_interval, this, SLOT(execute()));
             _nb_exec_before_response -= 1;
             return;
         }
@@ -86,10 +93,9 @@ public:
         writeResponse(result);
     }
 
-    int nb_executed;
-
 private:
     int _nb_exec_before_response;
+    int _interval;
 };
 
 class MyFirstTest : public QObject {
@@ -180,7 +186,7 @@ private slots:
 
         TestJsonClient client(&buffer);
 
-        TestDelayedResponse response(&client, QtJson::JsonObject());
+        TestDelayedResponse response(&client);
 
         response.start();
         qApp->processEvents();
@@ -203,7 +209,7 @@ private slots:
 
         TestJsonClient client(&buffer);
 
-        TestDelayedResponse response(&client, QtJson::JsonObject(), 0, 1000, 0);
+        TestDelayedResponse response(&client, 0, 1000, 0);
 
         response.start();
         qApp->processEvents();
@@ -229,7 +235,7 @@ private slots:
 
         TestJsonClient client(&buffer);
 
-        TestDelayedResponse response(&client, QtJson::JsonObject(), 1);
+        TestDelayedResponse response(&client, 1);
 
         response.start();
         qApp->processEvents();
@@ -253,7 +259,7 @@ private slots:
 
         TestJsonClient client(&buffer);
 
-        TestDelayedResponse response(&client, QtJson::JsonObject());
+        TestDelayedResponse response(&client);
 
         response.start();
         qApp->processEvents();

@@ -72,7 +72,7 @@ QPoint pointFromString(const QString & data) {
 
 DragNDropResponse::DragNDropResponse(JsonClient * client,
                                      const QtJson::JsonObject & command)
-    : DelayedResponse(client, command) {
+    : DelayedResponse(client) {
     WidgetLocatorContext<QWidget> ctx(static_cast<Player *>(jsonClient()),
                                       command, "srcoid");
     WidgetLocatorContext<QWidget> ctx2(static_cast<Player *>(jsonClient()),
@@ -107,54 +107,66 @@ DragNDropResponse::DragNDropResponse(JsonClient * client,
     m_destPos = destPos;
 }
 
-void DragNDropResponse::execute(int call) {
-    switch (call) {
-        case 0:  // pre-phase : ensure widgets are painted in order to
-                 // mapToGlobal to work
-            m_src->repaint();
-            m_dest->repaint();
-            setInterval(100);
-            break;
-        case 1:  // 1: press event
-            m_srcPosGlobal = m_src->mapToGlobal(m_srcPos);
-            m_destPosGlobal = m_dest->mapToGlobal(m_destPos);
+void DragNDropResponse::start() {
+    QTimer::singleShot(0, this, SLOT(execute_repaint()));
+}
 
-            qApp->postEvent(m_src,
-                            new QMouseEvent(QEvent::MouseButtonPress, m_srcPos,
-                                            m_srcPosGlobal, Qt::LeftButton,
-                                            Qt::NoButton, Qt::NoModifier));
-            break;
-        case 2: {  // 2: WaitForDragStart
-            setInterval(qApp->startDragTime() + 20);
-            break;
-        }
-        case 3: {  // 3: do some move event
-            setInterval(0);
-            QList<QPoint> moves;
-            calculate_drag_n_drop_moves(moves, m_srcPosGlobal, m_destPosGlobal,
-                                        4);
-            foreach (const QPoint & move, moves) {
-                QWidget * widgetUnderCursor = qApp->widgetAt(move);
-                if (widgetUnderCursor) {
-                    qApp->postEvent(
-                        widgetUnderCursor,
-                        new QMouseEvent(QEvent::MouseMove,
-                                        widgetUnderCursor->mapFromGlobal(move),
-                                        move, Qt::LeftButton, Qt::NoButton,
-                                        Qt::NoModifier));
-                }
+void DragNDropResponse::execute_repaint() {
+    // pre-phase: ensure widgets are painted in order to mapToGlobal to work
+    if (m_src && m_dest) {
+        m_src->repaint();
+        m_dest->repaint();
+    }
+    QTimer::singleShot(100, this, SLOT(execute_press()));
+}
+
+void DragNDropResponse::execute_press() {
+    if (m_src && m_dest) {
+        m_srcPosGlobal = m_src->mapToGlobal(m_srcPos);
+        m_destPosGlobal = m_dest->mapToGlobal(m_destPos);
+        qApp->postEvent(
+            m_src,
+            new QMouseEvent(QEvent::MouseButtonPress, m_srcPos, m_srcPosGlobal,
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier));
+    }
+    QTimer::singleShot(qApp->startDragTime() + 20, this, SLOT(execute_move()));
+}
+
+void DragNDropResponse::execute_move() {
+    if (m_src && m_dest) {
+        QList<QPoint> moves;
+        calculate_drag_n_drop_moves(moves, m_srcPosGlobal, m_destPosGlobal, 4);
+        foreach (const QPoint & move, moves) {
+            QWidget * widgetUnderCursor = qApp->widgetAt(move);
+            if (widgetUnderCursor) {
+                qApp->postEvent(
+                    widgetUnderCursor,
+                    new QMouseEvent(QEvent::MouseMove,
+                                    widgetUnderCursor->mapFromGlobal(move),
+                                    move, Qt::LeftButton, Qt::NoButton,
+                                    Qt::NoModifier));
             }
-            break;
         }
-        case 4: {  // 4: now release the button
-            qApp->postEvent(
-                m_dest,
-                new QMouseEvent(QEvent::MouseButtonRelease, m_destPos,
-                                m_destPosGlobal, Qt::LeftButton, Qt::NoButton,
-                                Qt::NoModifier));
-        }
-        case 5:  // and reply
-            writeResponse(QtJson::JsonObject());
-            break;
+    }
+    QTimer::singleShot(0, this, SLOT(execute_release()));
+}
+
+void DragNDropResponse::execute_release() {
+    if (m_src && m_dest) {
+        qApp->postEvent(m_dest,
+                        new QMouseEvent(QEvent::MouseButtonRelease, m_destPos,
+                                        m_destPosGlobal, Qt::LeftButton,
+                                        Qt::NoButton, Qt::NoModifier));
+    }
+    QTimer::singleShot(0, this, SLOT(execute_response()));
+}
+
+void DragNDropResponse::execute_response() {
+    if (m_src && m_dest) {
+        writeResponse(QtJson::JsonObject());
+    } else {
+        writeResponse(jsonClient()->createError(
+            "WidgetDestroyed",
+            "At least one of the drag&drop widgets has been destroyed"));
     }
 }

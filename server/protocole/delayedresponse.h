@@ -41,49 +41,27 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include <QTimer>
 
 /**
- * @brief Objet that represent a non blocking answer.
+ * @brief Object that represent a non blocking answer.
  *
  * A pointer of DelayedResponse may be returned by a Player's slot to return
- * an asynchron answer (that is, non blocking the main Qt loop).
+ * an asynchronous answer (that is, non blocking the main Qt event loop).
  *
- * A QTimer is used to call multiple times the execute() method, until
- * writeResponse() is called. After the writeResponse() call, execute()
- * won't be called again and the object will be deleted automatically.
- *
- * If the writeResponse() method is not called in the given time (timerOut,
- * given in the constructor), an automatic error response will be sent. Default
+ * Derived classes must call the writeResponse() once the response is available.
+ * If the writeResponse() method is not called in the given time (timeout, given
+ * in the constructor), an automatic error response will be sent. Default
  * timeout is 20 seconds.
  */
 class DelayedResponse : public QObject {
     Q_OBJECT
 public:
-    explicit DelayedResponse(JsonClient * client,
-                             const QtJson::JsonObject & command,
-                             int interval = 0, int timerOut = 20000);
+    explicit DelayedResponse(JsonClient * client, int timeout = 20000);
 
     /**
-     * @brief Define the intervall between each execute() call.
-     *
-     * By default, interval is 0, meaning that it will be called as soon
-     * as possible by Qt.
+     * @brief Start with the processing.
      */
-    void setInterval(int interval) { m_timer.setInterval(interval); }
-
-    /**
-     * @brief start the execute() calls.
-     */
-    void start();
+    virtual void start() = 0;
 
 protected:
-    /**
-     * @brief This needs to be implemented, this is the entry point for
-     * answering.
-     *
-     * This method MUST call writeResponse() at a given time to answer and
-     * ends the life cycle of this object.
-     */
-    virtual void execute(int call) = 0;
-
     /**
      * @brief Returns the response.
      *
@@ -93,18 +71,14 @@ protected:
     JsonClient * jsonClient() { return m_client; }
 
 private slots:
-    void timerCall();
-    void onTimerOut();
+    void onTimeout();
 
 signals:
     void aboutToWriteResponse(const QtJson::JsonObject &);
 
 private:
     JsonClient * m_client;
-    QTimer m_timer;
-    QString m_action;
     bool m_hasResponded;
-    int m_nbCall;
 };
 
 #endif  // DELAYEDRESPONSE_H

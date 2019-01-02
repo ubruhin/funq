@@ -38,6 +38,7 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include "delayedresponse.h"
 
 #include <QKeySequence>
+#include <QPointer>
 #include <QWidget>
 
 class ShortcutResponse : public DelayedResponse {
@@ -46,14 +47,17 @@ public:
     explicit ShortcutResponse(JsonClient * client,
                               const QtJson::JsonObject & command);
 
-protected:
-    virtual void execute(int call);
+    virtual void start();
 
 private slots:
-    void on_target_deleted();
+    void execute_repaint();
+    void execute_grab_keyboard();
+    void execute_press_keys();
+    void execute_release_keys();
+    void execute_release_keyboard();
 
 private:
-    QWidget * m_target;
+    QPointer<QWidget> m_target;
     QKeySequence m_binding;
 };
 

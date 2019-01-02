@@ -39,31 +39,13 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include <QDebug>
 #include <QTimer>
 
-DelayedResponse::DelayedResponse(JsonClient * client,
-                                 const QtJson::JsonObject & command,
-                                 int interval, int timerOut)
-    : QObject(client), m_client(client), m_hasResponded(false), m_nbCall(0) {
+DelayedResponse::DelayedResponse(JsonClient * client, int timeout)
+    : QObject(client), m_client(client), m_hasResponded(false) {
     Q_ASSERT(client);
-    m_timer.setInterval(interval);
-    connect(&m_timer, SIGNAL(timeout()), this, SLOT(timerCall()));
-
-    QTimer::singleShot(timerOut, this, SLOT(onTimerOut()));
-
-    m_action = command["action"].toString();
+    QTimer::singleShot(timeout, this, SLOT(onTimeout()));
 }
 
-void DelayedResponse::start() {
-    m_timer.start();
-}
-
-void DelayedResponse::timerCall() {
-    if (!m_hasResponded) {
-        execute(m_nbCall);
-        m_nbCall += 1;
-    }
-}
-
-void DelayedResponse::onTimerOut() {
+void DelayedResponse::onTimeout() {
     if (!m_hasResponded) {
         writeResponse(jsonClient()->createError(
             "DelayedResponseTimeOut",
@@ -73,7 +55,8 @@ void DelayedResponse::onTimerOut() {
 }
 
 void DelayedResponse::writeResponse(const QtJson::JsonObject & result) {
-    m_timer.stop();
+    Q_ASSERT(!m_hasResponded);
+
     emit aboutToWriteResponse(result);
     m_hasResponded = true;
 
@@ -81,7 +64,7 @@ void DelayedResponse::writeResponse(const QtJson::JsonObject & result) {
     QByteArray response = QtJson::serialize(result, success);
 
     if (!success) {
-        qDebug() << "unable to serialize result to json" << m_action;
+        qDebug() << "unable to serialize result to json";
         m_client->protocole()->close();
         return;
     }
