@@ -39,24 +39,27 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include <QTextStream>
 #include <QtDebug>
 
+static qint64 timeOffset = 0;
+
 void myMessageHandler(QtMsgType type, const QMessageLogContext &,
                       const QString & msg) {
     QString txt;
+    txt += QString("%1 - ").arg(QDateTime::currentMSecsSinceEpoch() - timeOffset);
     switch (type) {
         case QtDebugMsg:
-            txt = QString("Debug: %1").arg(msg);
+            txt += QString("Debug: %1").arg(msg);
             break;
         case QtWarningMsg:
-            txt = QString("Warning: %1").arg(msg);
+            txt += QString("Warning: %1").arg(msg);
             break;
         case QtCriticalMsg:
-            txt = QString("Critical: %1").arg(msg);
+            txt += QString("Critical: %1").arg(msg);
             break;
         case QtFatalMsg:
-            txt = QString("Fatal: %1").arg(msg);
+            txt += QString("Fatal: %1").arg(msg);
             break;
         default:
-            txt = QString("%1").arg(msg);
+            txt += QString("%1").arg(msg);
             break;
     }
     QFile outFile("log.txt");
@@ -72,6 +75,7 @@ inline void execDialog(QLabel * statusLabel, QWidget * parent) {
 }
 
 int main(int argc, char * argv[]) {
+    timeOffset = QDateTime::currentMSecsSinceEpoch();
     qInstallMessageHandler(myMessageHandler);  // Install the handler
     qDebug() << "=======================================================";
 
