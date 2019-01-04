@@ -442,6 +442,7 @@ QtJson::JsonObject Player::object_set_properties(
         return ctx.lastError;
     }
     QVariantMap properties = command["properties"].value<QVariantMap>();
+    qDebug() << "[libFunq] object_set_properties():" << ctx.obj->objectName();
     emit_object_set_properties(ctx.obj, properties);
     QtJson::JsonObject result;
     return result;
@@ -449,10 +450,12 @@ QtJson::JsonObject Player::object_set_properties(
 
 void Player::_object_set_properties(QObject * object,
                                     const QVariantMap & properties) {
+  qDebug() << "[libFunq] _object_set_properties() ENTER:" << object->objectName();
     for (QtJson::JsonObject::const_iterator iter = properties.begin();
          iter != properties.end(); ++iter) {
         object->setProperty(iter.key().toStdString().c_str(), iter.value());
     }
+    qDebug() << "[libFunq] _object_set_properties() LEAVE:" << object->objectName();
 }
 
 void recursive_list_widget(QWidget * widget, QtJson::JsonObject & out,
