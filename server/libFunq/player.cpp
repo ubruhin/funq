@@ -66,6 +66,7 @@ using namespace ObjectPath;
 
 template <class T>
 void mouse_click(T * w, const QPoint & pos, Qt::MouseButton button) {
+  qDebug() << "[libFunq] mouse_click()";
     QPoint global_pos = w->mapToGlobal(pos);
     qApp->postEvent(w,
                     new QMouseEvent(QEvent::MouseButtonPress, pos, global_pos,
@@ -77,6 +78,7 @@ void mouse_click(T * w, const QPoint & pos, Qt::MouseButton button) {
 
 template <class T>
 void mouse_dclick(T * w, const QPoint & pos) {
+  qDebug() << "[libFunq] mouse_dclick()";
     mouse_click(w, pos, Qt::LeftButton);
     qApp->postEvent(
         w,

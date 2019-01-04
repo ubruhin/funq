@@ -35,6 +35,35 @@ knowledge of the CeCILL v2.1 license and that you accept its terms.
 #include "widgets.h"
 
 #include <QApplication>
+#include <QFile>
+#include <QTextStream>
+#include <QtDebug>
+
+void myMessageHandler(QtMsgType type, const QMessageLogContext &,
+                      const QString & msg) {
+    QString txt;
+    switch (type) {
+        case QtDebugMsg:
+            txt = QString("Debug: %1").arg(msg);
+            break;
+        case QtWarningMsg:
+            txt = QString("Warning: %1").arg(msg);
+            break;
+        case QtCriticalMsg:
+            txt = QString("Critical: %1").arg(msg);
+            break;
+        case QtFatalMsg:
+            txt = QString("Fatal: %1").arg(msg);
+            break;
+        default:
+            txt = QString("%1").arg(msg);
+            break;
+    }
+    QFile outFile("log.txt");
+    outFile.open(QIODevice::WriteOnly | QIODevice::Append);
+    QTextStream ts(&outFile);
+    ts << txt << endl;
+}
 
 template <typename T>
 inline void execDialog(QLabel * statusLabel, QWidget * parent) {
@@ -43,6 +72,9 @@ inline void execDialog(QLabel * statusLabel, QWidget * parent) {
 }
 
 int main(int argc, char * argv[]) {
+    qInstallMessageHandler(myMessageHandler);  // Install the handler
+    qDebug() << "=======================================================";
+
     QApplication app(argc, argv);
 
     if (app.arguments().contains("--show-message-box-at-startup")) {

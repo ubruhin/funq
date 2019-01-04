@@ -112,4 +112,15 @@ script:
   - cd tests-functionnal/funq-test-app && qmake && make -j4 && cd ../..
   - cd client && $PYTHON setup.py test; cd ..
   - make -C server/tests/ check
-  - cd tests-functionnal && nosetests && cd ..
+  - cd tests-functionnal
+  # run tests multiple times to also catch sporadic errors
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests
+  - nosetests

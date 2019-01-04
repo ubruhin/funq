@@ -52,7 +52,10 @@ public:
     virtual ~SimpleDialog() {}
 
 protected slots:
-    void showResult(const QString & msg) { _statusLabel->setText(msg); }
+    void showResult(const QString & msg) {
+      _statusLabel->setText(msg);
+      qDebug() << "[app] SimpleDialog::showResult():" << msg;
+    }
 };
 
 class ActionDialog : public SimpleDialog {
@@ -98,7 +101,10 @@ public:
     }
 
 private slots:
-    void btnClicked() { showResult("clicked !"); }
+    void btnClicked() {
+      qDebug() << "[app] ClickDialog::btnClicked()";
+      showResult("clicked !");
+    }
 };
 
 class WidgetClickDialog : public SimpleDialog {
@@ -112,6 +118,7 @@ public:
     }
 
     void mouseReleaseEvent(QMouseEvent * e) {
+        qDebug() << "[app] WidgetClickDialog::mouseReleaseEvent()";
         if (e->button() == Qt::LeftButton) {
             showResult("left clicked !");
         } else if (e->button() == Qt::RightButton) {
@@ -136,6 +143,7 @@ public:
 
     void mouseDoubleClickEvent(QMouseEvent * e) {
         Q_UNUSED(e);
+      qDebug() << "[app] DoubleClickDialog::mouseDoubleClickEvent()";
         showResult("double clicked !");
     }
 };
@@ -183,6 +191,7 @@ private slots:
     void shortcutActivated() {
         QString sequence =
             qobject_cast<QShortcut *>(sender())->key().toString();
+        qDebug() << "[app] ShortcutDialog::shortcutActivated():" << sequence;
         showResult("Shortcut: " + sequence.toUpper());
     }
 };
@@ -214,10 +223,12 @@ public:
 
 private slots:
     void hheaderClicked(int logicalIndex) {
+      qDebug() << "[app] TableDialog::hheaderClicked()";
         showResult("H Header clicked: " + QString::number(logicalIndex));
     }
 
     void vheaderClicked(int logicalIndex) {
+      qDebug() << "[app] TableDialog::vheaderClicked()";
         showResult("V Header clicked: " + QString::number(logicalIndex));
     }
 };

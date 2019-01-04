@@ -95,6 +95,8 @@ void JsonClient::onMessageReceived() {
         return;
     }
 
+    qDebug() << "[libFunq] Command received:" << action;
+
     bool is_delayed_call =
         !(strcmp(method.typeName(), "QtJson::JsonObject") == 0);
 

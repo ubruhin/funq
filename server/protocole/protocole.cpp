@@ -96,6 +96,7 @@ bool Protocole::sendMessage(const QByteArray & ba) {
     messageToSend.append('\n');
     messageToSend.append(ba);
     m_device->write(messageToSend);
+    qDebug() << "[libFunq] Response sent";
     return true;
 }
 

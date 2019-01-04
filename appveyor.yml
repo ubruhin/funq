@@ -28,3 +28,6 @@ build_script:
   - nosetests
   - nosetests
   - nosetests
+
+on_failure:
+  - appveyor PushArtifact log.txt
