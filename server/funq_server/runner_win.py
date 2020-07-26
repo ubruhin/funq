@@ -73,7 +73,8 @@ class WindowsRunnerInjector(RunnerInjector):
             qt_lib_names = ['qtguid4', 'qtgui4', 'qt5guid', 'qt5gui']
             if len(set(qt_lib_names).intersection(set(lib_names))) > 0:
                 break
-            time.sleep(0.01)
+            time.sleep(1)
+            break
 
         # wait a bit, and hope that QT is now really initialized !
         time.sleep(1)
