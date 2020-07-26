@@ -133,6 +133,13 @@ matrix:
       python: 3.8
       env: QT_SELECT=5.14.2 PYTHON=python
 
+    # Linux Qt5.15.0 Python2.7
+    - os: linux
+      dist: bionic
+      language: python
+      python: 2.7
+      env: QT_SELECT=5.15.0 PYTHON=python
+
 install:
   - source ./ci/install_dependencies.sh # source required because of exports
   - $PYTHON --version                   # check exact python version
