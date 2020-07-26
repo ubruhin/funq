@@ -42,8 +42,10 @@ class WindowsRunnerInjector(RunnerInjector):
 
     def start_subprocess(self):
         RunnerInjector.start_subprocess(self)
+        print("--- started")
         # wait for the process to be be running...
         proc = winappdbg.Process(self._proc.pid)
+        print("--- proc: " + str(proc))
         start = time.time()
         while True:
             # wait for QT to be loaded
@@ -58,13 +60,16 @@ class WindowsRunnerInjector(RunnerInjector):
                                    " launched. Is the executable linked to"
                                    " qt4 ?")
             try:
+                print("--- scan_modules()")
                 proc.scan_modules()
-            except WindowsError:
+            except WindowsError as e:
                 # Following exception occurs sometimes, but it still works fine
                 # so let's ignore it: WindowsError: [Error 299] Only part of a
                 # ReadProcessMemory or WriteProcessMemory request was completed
+                print("--- WindowsError: " + str(e))
                 pass
             lib_names = [lib.get_name() for lib in proc.iter_modules()]
+            print("--- lib_names: " + str(lib_names))
             qt_lib_names = ['qtguid4', 'qtgui4', 'qt5guid', 'qt5gui']
             if len(set(qt_lib_names).intersection(set(lib_names))) > 0:
                 break
@@ -73,4 +78,6 @@ class WindowsRunnerInjector(RunnerInjector):
         # wait a bit, and hope that QT is now really initialized !
         time.sleep(1)
         # we can inject the dll
+        print("--- inject")
         proc.inject_dll(self.library_path)
+        print("--- injected")

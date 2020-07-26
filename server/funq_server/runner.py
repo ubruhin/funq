@@ -49,8 +49,11 @@ class RunnerInjector(object):
         self._proc = None
 
     def run(self):
+        print("--- start_subprocess()")
         self.start_subprocess()
+        print("--- wait__subprocess()")
         return self.wait__subprocess()
+        print("--- run() end")
 
     def start_subprocess(self):
         self._proc = subprocess.Popen(self.args, env=self.env)
@@ -109,6 +112,7 @@ class Runner(object):
             env['FUNQ_HOST'] = str(opts.host)
 
         library_path = self._find_library()
+        print("library_path: " + library_path)
         if not os.path.isfile(library_path):
             raise RuntimeError("Unable to find funq library %r" % library_path)
 
